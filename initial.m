@@ -10,7 +10,7 @@ loc=[];
 summary_daily_plot=false;
 track_plot_daily = false;
 summary_monthly_plot=true;
-                        dbgstate=false;;
+dbgstate=false;;
 
 for j=1:1:size(AllBom,1)
     % details=split(AllBom(j).name,".");
@@ -86,25 +86,25 @@ daily_3pm_day=[];
 daily_3pm_temp=[];
 daily_3pm_rh=[];
 
-    monthly_3pm=[];
-    monthly_3pm_day=[];
-    monthly_3pm_temp=[];
-    monthly_3pm_rh=[];
+monthly_3pm=[];
+monthly_3pm_day=[];
+monthly_3pm_temp=[];
+monthly_3pm_rh=[];
 
-    monthly_9am=[];
-    monthly_9am_day=[];
-    monthly_9am_temp=[];
-    monthly_9am_rh=[];
+monthly_9am=[];
+monthly_9am_day=[];
+monthly_9am_temp=[];
+monthly_9am_rh=[];
 
-    yearly_3pm=[];
-    yearly_3pm_day=[];
-    yearly_3pm_temp=[];
-    yearly_3pm_rh=[];
+yearly_3pm=[];
+yearly_3pm_day=[];
+yearly_3pm_temp=[];
+yearly_3pm_rh=[];
 
-    yearly_9am=[];
-    yearly_9am_day=[];
-    yearly_9am_temp=[];
-    yearly_9am_rh=[];
+yearly_9am=[];
+yearly_9am_day=[];
+yearly_9am_temp=[];
+yearly_9am_rh=[];
 
 ac_stats=["ModeSId","Reports", "DeltaErr", "MinAlt", "MaxAlt", "MinRng", "MaxRng", "MinElev", "MaxElev", "Start", "Stop"];
 for i = 1:1:size(AllDays,1)
@@ -193,7 +193,7 @@ for i = 1:1:size(AllDays,1)
                             debug_out(dbgstate, sprintf("Error missing  %s in BOM Data\n",this_sample));
                             continue;
                         end
-                 
+
 
                         debug_out(dbgstate, sprintf("\n******** PASSED checks: Proceeding with %s (Number %d of %d)\n*********\n",this_sample,j,NumberOfTracksThisDay));
 
@@ -390,31 +390,31 @@ for i = 1:1:size(AllDays,1)
 
     % plot these
     if summary_monthly_plot
-      if tomor_mth ~= today_mth
-        plot_stats(daily_9am,"Monthly 9am "+today_mth);
-        plot_stats(daily_3pm,"Monthly 3pm"+today_mth); % use 9am as we will use that month (next 3pm will be used for next month)
+        if tomor_mth ~= today_mth
+            plot_stats(daily_9am,"Monthly 9am "+today_mth);
+            plot_stats(daily_3pm,"Monthly 3pm"+today_mth); % use 9am as we will use that month (next 3pm will be used for next month)
 
-    yearly_3pm=[yearly_3pm; monthly_3pm];
-    yearly_3pm_day=[yearly_3pm_day; monthly_3pm_day];
-    yearly_3pm_temp=[yearly_3pm_temp; monthly_3pm_temp];
-    yearly_3pm_rh=[yearly3_pm_rh; monthly_3pm_rh];
+            yearly_3pm=[yearly_3pm; monthly_3pm];
+            yearly_3pm_day=[yearly_3pm_day; monthly_3pm_day];
+            yearly_3pm_temp=[yearly_3pm_temp; monthly_3pm_temp];
+            yearly_3pm_rh=[yearly3_pm_rh; monthly_3pm_rh];
 
-    yearly_9am=[yearly_9am; monthly_9am];
-    yearly_9am_day=[yearly_9am_day; monthly_9am_day];
-    yearly_9am_temp=[yearly_9am_temp; monthly_9am_temp];
-    yearly_9am_rh=[yearly_9am_rh; monthly_9am_rh];
+            yearly_9am=[yearly_9am; monthly_9am];
+            yearly_9am_day=[yearly_9am_day; monthly_9am_day];
+            yearly_9am_temp=[yearly_9am_temp; monthly_9am_temp];
+            yearly_9am_rh=[yearly_9am_rh; monthly_9am_rh];
 
-    monthly_3pm=[];
-    monthly_3pm_day=[];
-    monthly_3pm_temp=[];
-    monthly_3pm_rh=[];
+            monthly_3pm=[];
+            monthly_3pm_day=[];
+            monthly_3pm_temp=[];
+            monthly_3pm_rh=[];
 
-    monthly_9am=[];
-    monthly_9am_day=[];
-    monthly_9am_temp=[];
-    monthly_9am_rh=[];
+            monthly_9am=[];
+            monthly_9am_day=[];
+            monthly_9am_temp=[];
+            monthly_9am_rh=[];
 
-      end
+        end
 
     end
     % save yearly for overall average to compare later
@@ -514,10 +514,10 @@ title(titnam) % first to last of daily_9am_day
 %[y2 y2s y2m] = stats(daily9am); % check if same or not
 end
 
-                    function q=is_qos(d)
-                    if length(d)>8
-                        q="yes";
-                    else
-                        q="no";
-                    end
-                    end
+function q=is_qos(d)
+if length(d)>8
+    q="yes";
+else
+    q="no";
+end
+end
