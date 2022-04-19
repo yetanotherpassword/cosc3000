@@ -157,15 +157,20 @@ for i = 1:1:size(AllDays,1)
                    maxelev=max(T1.Elevation);
                    ac_stats=["ModeSId","Reports", "DeltaErr", "MinAlt", "MaxAlt", "MinRng", "MaxRng", "MinElev", "MaxElev", "Start", "Stop"]
                    ac_data=[msid samples max_delta_error minalt maxalt  min_range max_range minelev maxelev mintime maxtime];
-
+%col1=[0.9290 0.6940 0.1250]; % Gold >10 deg elev
+col1=[1 228/255 149/255]
+col2=[1 0.5 0.5]; % Red between 5 and 10 deg elev
+%col3=[0.4660 0.6740 0.1880]; % Green between 2 and 5 deg elevation
+col3=[7/255 204/255 7/255];
+col4=[0 0 1]; % Blue less than 2 deg elevation
                    col_elev=zeros(samples,3);
-                   col_elev(:,:)=col_elev(:,:)+[1 0 1];
+                   col_elev(:,:)=col_elev(:,:)+col1; 
                    col_lt10=find(T1.Elevation<=10);
                    col_lt5=find(T1.Elevation<=5);
                    col_lt2=find(T1.Elevation<=2);
-                   col_elev(col_lt10,:)=zeros(size(col_lt10,1),3)+[1 0 0];
-                   col_elev(col_lt5,:)=zeros(size(col_lt5,1),3)+[0 1 0]; % 1==OUT Bound, 0==IN bound
-                   col_elev(col_lt2,:)=zeros(size(col_lt2,1),3)+[0 0 1];
+                  col_elev(col_lt10,:)=zeros(size(col_lt10,1),3)+col2;
+                   col_elev(col_lt5,:)=zeros(size(col_lt5,1),3)+col3; % 1==OUT Bound, 0==IN bound
+                   col_elev(col_lt2,:)=zeros(size(col_lt2,1),3)+col4;
 
  %                  colour_approach=[zeros(samples,1) ones(samples,1) col_approach];
 
@@ -179,41 +184,70 @@ for i = 1:1:size(AllDays,1)
 %                    matrix unless all same size (padding) so encoding with
 %                    in col vector using a size vertor
 
-                    figure;
+                    f=figure;
+                    f.Renderer = 'painters';
+                    p1=plot(T1.RFS_Range,T1.RangeError-RangeBias,':k','LineWidth', 1);
+                    hold on
                     coefficients = polyfit(T1.RFS_Range,T1.RangeError-RangeBias, 2);
                     xFit = linspace(min_range, max_range, samples);
                     yFit = polyval(coefficients , xFit);
                     txt1=sprintf("%s\n",ac_stats);
                     txt2=sprintf("%s\n",ac_data);
-                    scatter(xFit, yFit,1,col_elev, 'LineWidth', 2);
+                    fv = [1:samples-1;2:samples]';
+p2=patch('faces',fv,'vertices',[xFit; yFit]',...
+'faceVertexCData',col_elev,...
+'edgecolor','flat',...
+'linewidth',2)
+
+                    %scatter(xFit, yFit,1,col_elev, 'LineWidth', 2);
                     hold on;
-                    text(5,min(yFit)+20,txt1)
-                    text(20,min(yFit)+20,txt2)
 
-                    colormap([1 0 1; 1 0 0; 0 1 0; 0 0 1]);
 
-                   colorbar('Ticks',[0.125,0.375,0.625,0.875],...
-                            'TickLabels',{'>10 deg','<=10 deg','<=5 deg','<=2 deg'})
+                    %colormap([0.9290 0.6940 0.1250; 1 0 0; 0.4660 0.6740 0.1880; 0 0 1]);
+                    colormap([col1; col2; col3; col4]);
 
-             
+
+                   hcb=colorbar('Ticks',[0.125,0.375,0.625,0.875],...
+                            'TickLabels',{'>10^o','<=10^o','<=5^o','<=2^o'})
+
+             colorTitleHandle = get(hcb,'Title');
+titleString = sprintf('Aircraft Elevation Angle\n(to Radar)');
+set(colorTitleHandle ,'String',titleString);
 
                     if q==1
-                       Period="3pm "+string(yester)+" "+string(AllBomData{yesbomref,11})+"^oC "+string(AllBomData{yesbomref,12})+"% Rel Humd";
+                       Period = sprintf("3pm +/- 1 hr %s      %s^oC      %s%% Rel Humid",string(yester),string(AllBomData{yesbomref,11}),string(AllBomData{yesbomref,12}));                    
+
+                       %Period="3pm "+string(yester)+" "+string(AllBomData{yesbomref,11})+"^oC "+string(AllBomData{yesbomref,12})+"% Rel Humd";
                       actual_T1_samples_3pm=[actual_T1_samples_3pm; samples];
                        actual_T1_Range_3pm=[actual_T1_Range_3pm; T1.RFS_Range];
                        actual_T1_RangeErr_3pm=[actual_T1_RangeErr_3pm; T1.RangeError-RangeBias];
                        fname="~/"+msid+"_3pm_"+string(yester)+".png";
 
-                    else
-                       Period = "9am "+ThisDate+" "+string(AllBomData{bomref,5})+"^oC "+string(AllBomData{bomref,6})+"% Rel Humd";                        
+                    else  
+                        Period = sprintf("9am +/- 1 hr %s      %s^oC      %s%% Rel Humid",ThisDate,string(AllBomData{bomref,5}),string(AllBomData{bomref,6}));                    
+
+                       %Period = "9am "+ThisDate+" "+string(AllBomData{bomref,5})+"^oC "+string(AllBomData{bomref,6})+"% Rel Humd";                        
                         actual_T1_samples_9am=[actual_T1_samples_9am; samples];
                        actual_T1_Range_9am=[actual_T1_Range_9am; T1.RFS_Range];
                        actual_T1_RangeErr_9am=[actual_T1_RangeErr_9am; T1.RangeError-RangeBias];
                        fname="~/"+msid+"_9am_"+ThisDate+".png";
                     end
-                    title(Period);
+
+                                   
+
+                    titlename=sprintf("Range vs Range Error (Actual and Regession)\n");
+                    title(titlename+Period);
+                    xlabel("Range to Aircraft (Nautical Miles)");
+                    ylabel("Range Error (metres)");
+                    legend("Actual Error","Regression Error")
+                                        yl=ylim;
+                    text(220,yl(2)-0.2*(yl(2)-yl(1)),txt1)
+                    text(235,yl(2)-0.2*(yl(2)-yl(1)),txt2)
+                    box on
                     set(gcf, 'Position', get(0, 'Screensize'));
                     saveas(gcf,fname);
+                    close
+
 
 %                    figure(3);
 
