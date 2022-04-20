@@ -1,4 +1,4 @@
-clear all
+clear allyearly_3pm_rh
 close all
 delimiter = ',';
 bomdir="~/bom_bne/";
@@ -11,7 +11,9 @@ summary_daily_plot=false;
 track_plot_daily = false;
 summary_monthly_plot=true;
 dbgstate=false;
-dbgstate2=true;
+
+
+
 
 for j=1:1:size(AllBom,1)
     % details=split(AllBom(j).name,".");
@@ -140,7 +142,8 @@ for i = 1:1:size(AllDays,1)
                     RangeErrCnt=str2double(a(159)); % ie field 67 on 2nd line
                     RangeBias=str2double(a(163)); % ie field 71 on 2nd line
                     if (isnan(RangeBias) || isnan(RangeErrCnt) || RangeErrCnt==0)
-                        debug_out(dbgstate,sprintf("Skipping %s as RangeErrorCount BT 2 and 10 == %d giving RangeBias %d\n",ThisTrackFname,RangeErrCnt, RangeBias) );
+                        debug_out(true,sprintf("Skipping %s as RangeErrorCount BT 2 and 10 == %d giving RangeBias %d\n",ThisTrackFname,RangeErrCnt, RangeBias) );
+                        continue
                     end
                     T = readtable(ThisTrackFname,opts);
                     T.Properties.VariableNames=varNames;
@@ -392,12 +395,12 @@ for i = 1:1:size(AllDays,1)
     if summary_monthly_plot
         if tomor_mth ~= today_mth
             plot_stats(daily_9am,"Monthly 9am "+today_mth);
-            plot_stats(daily_3pm,"Monthly 3pm"+today_mth); % use 9am as we will use that month (next 3pm will be used for next month)
+            plot_stats(daily_3pm,"Monthly 3pm" +today_mth); % use 9am as we will use that month (next 3pm will be used for next month)
 
             yearly_3pm=[yearly_3pm; monthly_3pm];
             yearly_3pm_day=[yearly_3pm_day; monthly_3pm_day];
             yearly_3pm_temp=[yearly_3pm_temp; monthly_3pm_temp];
-            yearly_3pm_rh=[yearly3_pm_rh; monthly_3pm_rh];
+            yearly_3pm_rh=[yearly_3pm_rh; monthly_3pm_rh];
 
             yearly_9am=[yearly_9am; monthly_9am];
             yearly_9am_day=[yearly_9am_day; monthly_9am_day];
