@@ -10,7 +10,8 @@ loc=[];
 summary_daily_plot=false;
 track_plot_daily = false;
 summary_monthly_plot=true;
-dbgstate=false;;
+dbgstate=false;
+dbgstate2=true;
 
 for j=1:1:size(AllBom,1)
     % details=split(AllBom(j).name,".");
@@ -109,6 +110,7 @@ yearly_9am_rh=[];
 ac_stats=["ModeSId","Reports", "DeltaErr", "MinAlt", "MaxAlt", "MinRng", "MaxRng", "MinElev", "MaxElev", "Start", "Stop"];
 for i = 1:1:size(AllDays,1)
     if length(AllDays(i).name) ~= 10
+        fprintf("%%%%%% Unexpected file/dir %s expected dir of format YYYY-MM-DD, skipping\n",AllDays(i).name)
         continue
     else
         if (AllDays(i).isdir)
@@ -135,9 +137,11 @@ for i = 1:1:size(AllDays,1)
                     summary1 = fscanf(fid, '%s\n');
                     fclose(fid);
                     a=split(summary1,',');
+                    RangeErrCnt=str2double(a(159)); % ie field 67 on 2nd line
                     RangeBias=str2double(a(163)); % ie field 71 on 2nd line
-
-
+                    if (isnan(RangeBias) || isnan(RangeErrCnt) || RangeErrCnt==0)
+                        debug_out(dbgstate,sprintf("Skipping %s as RangeErrorCount BT 2 and 10 == %d giving RangeBias %d\n",ThisTrackFname,RangeErrCnt, RangeBias) );
+                    end
                     T = readtable(ThisTrackFname,opts);
                     T.Properties.VariableNames=varNames;
                     today=posixtime(datetime(ThisDate));
@@ -239,6 +243,13 @@ for i = 1:1:size(AllDays,1)
                         coefficients = polyfit(T1.RFS_Range,T1.RangeError-RangeBias, 2);
                         xFit = linspace(min_range, max_range, samples);
                         yFit = polyval(coefficients , xFit);
+                        if sum(isnan(yFit)) ~= 0
+                            fprintf("NAN produced by regression on %s\n",this_sample);
+                            coefficients
+                            nanidx=find(isnan(yFit))
+                            T1.RFS_Detection_Time(nanidx)
+                            stop
+                        end
                         txt1=sprintf("%s\n",ac_stats);
                         txt2=sprintf("%s\n",ac_data);
                         fv = [1:samples-1;2:samples]';
@@ -323,7 +334,13 @@ for i = 1:1:size(AllDays,1)
 
 
                         [rerr_avg rerr_std rerr_median] = stats(ytrap);
-
+% if sum(isnan(ytrap)) ~= 0
+%      fprintf("NAN produced by regression on %s at stats call\n",this_sample);
+%                             coefficients
+%                             nanidx=find(isnan(ytrap))
+%                             xtrap(nanidx)
+%                             stop
+% end
 
                         if q==1
                             y_3pm=[y_3pm; rerr_avg ];
@@ -342,19 +359,7 @@ for i = 1:1:size(AllDays,1)
 
                 end
             end
-            %        figure;
-            %
-            %                    coefficients = polyfit(actual_T1_Range_9am,actual_T1_RangeErr_9am, 2);
-            %                    xFit = linspace(0, 250, size(actual_T1_Range_9am,1));
-            %                    yFit = polyval(coefficients , xFit);
-            %                    txt=sprintf("9am : %d Tracks for %s",sampletracks_9am,ThisDate);
-            %                    scatter(xFit, yFit,20);
-            %                    hold on;
-            %                    title("Range VS Interpolated Range Error (Incoming/Outgoing)"+txt)
-            %                    xlabel("Range (Nautical Miles)");
-            %                    ylabel("Range Error (metres) (Interpolated)")
-            %                    inoutcolr=[0 1 0; 0 1 1]; colormap(inoutcolr); colorbar
-            %                    grid on
+
             if summary_daily_plot
                 plot_stats(extrap_rng_err_3pm,"Daily 3pm"+yester_str);
                 plot_stats(extrap_rng_err_9am,"Daily 3pm"+today_str);
@@ -362,21 +367,16 @@ for i = 1:1:size(AllDays,1)
             end
             daily_3pm=[daily_3pm; extrap_rng_err_3pm];
             daily_3pm_day=[daily_3pm_day; Date_3pm];
-            daily_3pm_temp=[daily_3pm_temp; Temp_3pm]
-            daily_3pm_rh=[daily_3pm_rh; RelHum_3pm]
+            daily_3pm_temp=[daily_3pm_temp; Temp_3pm];
+            daily_3pm_rh=[daily_3pm_rh; RelHum_3pm];
 
             daily_9am=[daily_9am; extrap_rng_err_9am];
             daily_9am_day=[daily_9am_day; Date_9am];
-            daily_9am_temp=[daily_9am_temp; Temp_9am]
-            daily_9am_rh=[daily_9am_rh; RelHum_9am]
-
-
-
-        else
-            debug_out(dbgstate, sprintf("%s is not a dir, skipping...\n",AllDays(i).name));
-            continue
+            daily_9am_temp=[daily_9am_temp; Temp_9am];
+            daily_9am_rh=[daily_9am_rh; RelHum_9am];
         end
     end
+ 
     % Get monthly max and min temp and humidity
     [max9t maxidx9t]=max(daily_9am_temp);
     [min9t minidx9t]=min(daily_9am_temp);
@@ -449,31 +449,6 @@ stdev=std(array);
 median1=median(array);
 end
 
-function  colvect=colorAtAlt(i)
-newalt = i*65535/15000;
-c1=newalt/256;
-c2 = rem(newalt,256);
-colvect=[1 c2/256 c1/256];
-end
-
-function [col avgalt]=getAlt(i, T)
-[TR501 fiftyidx]=find(T.RFS_Range>i-0.1);
-if isempty(fiftyidx)
-    col=[1 1 1];
-    avgalt=-1;
-else
-    [TR502 fiftyidx2]=find(TR501 < i+0.1);
-    if isempty(fiftyidx2)
-        col = [1 1 1];
-        avgalt=-1;
-    else
-        alts1 = T.GeoHeight(fiftyidx);
-        alts2 = alts1(fiftyidx2);
-        avgalt=mean(alts2);
-        col=colorAtAlt(avgalt);
-    end
-end
-end
 
 function timeidx=getTime(i, T)
 if (i-3600 >= 0 && i+3600 <= 86400)
@@ -503,12 +478,13 @@ x=[0:1:250];
 y=mean(errs,'omitnan');
 ym=median(errs,'omitnan');
 ys=std(errs,'omitnan');
-ymax=max(errs,[],'omitnan');
-ymin=min(errs,[],'omitnan');
+%ymax=max(errs,[],'omitnan');
+%ymin=min(errs,[],'omitnan');
 errorbar(x,y,ys);
 hold on
-errorbar(x,ym,ymin,ymax)
-legend("Average (+/- STD)","Median (Max,Min)")
+%errorbar(x,ym,ymin,ymax)
+plot(x,ym)
+legend("Average (+/- 1 sigma)","Median")
 title(titnam) % first to last of daily_9am_day
 %errorbar(x,ym,[rerr_0_std rerr_50_std rerr_100_std rerr_150_std rerr_200_std rerr_250_std ]);
 %[y2 y2s y2m] = stats(daily9am); % check if same or not
