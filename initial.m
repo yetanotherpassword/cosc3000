@@ -1,18 +1,39 @@
 clear allyearly_3pm_rh
 close all
+startingtime=datestr(now);
+started=sprintf("###### Starting now at %s\n",startingtime);
+fprintf("%s",started);
 delimiter = ',';
-bomdir="~/bom_bne/";
+
+
+summary_daily_plot=true;
+track_plot_daily = true;
+summary_monthly_plot=true;
+dbgstate=true;
+
+
+site="bn";
+if site=="bn"
+   srcdir="~/bn_data/";
+   bomdir="~/bom_bne/";
+   radnam="SIC_045_BNE";
+else
+   radnam="SIC_049_MCD";
+   bomdir="~/bom_ml/";
+   srcdir="~/mlVdata/";
+end
+
+outdir=srcdir+"out/";
+if ~isdir(outdir)
+    mkdir (outdir)
+end
+stop
+radnamstr=replace(radnam,'_',' ');
 AllBomData=[];
 AllBom=dir (bomdir+"*.csv");
 varNames={'Date','MinTemp','MaxTemp','Rainfall','9amTemp','9amRelHumid','9amOktas','9amWindDir','9amWindSpd','9amMSLPres','3pmTemp','3pmRelHumid','3pmOktas','3pmWindDir','3pmWindSpd','3pmMSLPres' };
 varTypes = {'char','double','double','double','double',   'double',     'int',     'char',       'int',       'double',    'double',   'double',     'int',     'char',       'int',       'double' } ;
 loc=[];
-summary_daily_plot=false;
-track_plot_daily = false;
-summary_monthly_plot=true;
-dbgstate=false;
-
-
 
 
 for j=1:1:size(AllBom,1)
@@ -33,7 +54,7 @@ end
 
 
 
-AllDays=dir ("~/bn_data/");
+AllDays=dir (srcdir);
 
 
 
@@ -60,9 +81,7 @@ ys_3pm=[];
 y_9am=[];
 ym_9am=[];
 ys_9am=[];
-actual_T1_samples=[];
-actual_T1_Range=[];
-actual_T1_RangeErr=[];
+
 ytraps_3pm=[];
 ytraps_9am=[];
 cols_3pm=[];
@@ -70,55 +89,64 @@ alts_3pm=[];
 cols_9am=[];
 alts_9am=[];
 
-colour_approach_9am=[];
-actual_T1_samples_9am=[];
-actual_T1_Range_9am=[];
-actual_T1_RangeErr_9am=[];
-colour_approach_3pm=[];
-actual_T1_samples_3pm=[];
-actual_T1_Range_3pm=[];
-actual_T1_RangeErr_3pm=[];
+% colour_approach_9am=[];
+% actual_T1_samples_9am=[];
+% actual_T1_Range_9am=[];
+% actual_T1_RangeErr_9am=[];
+% colour_approach_3pm=[];
+% actual_T1_samples_3pm=[];
+% actual_T1_Range_3pm=[];
+% actual_T1_RangeErr_3pm=[];
 
 
 daily_9am=[];
 daily_9am_day=[];
 daily_9am_temp=[];
 daily_9am_rh=[];
+daily_9am_tracks=[];
+
 daily_3pm=[];
 daily_3pm_day=[];
 daily_3pm_temp=[];
 daily_3pm_rh=[];
+daily_3pm_tracks=[];
 
 monthly_3pm=[];
 monthly_3pm_day=[];
 monthly_3pm_temp=[];
 monthly_3pm_rh=[];
+monthly_3pm_tracks=[];
 
 monthly_9am=[];
 monthly_9am_day=[];
 monthly_9am_temp=[];
 monthly_9am_rh=[];
+monthly_9am_tracks=[];
+
+
 
 yearly_3pm=[];
 yearly_3pm_day=[];
 yearly_3pm_temp=[];
 yearly_3pm_rh=[];
+yearly_3pm_tracks=[];
 
 yearly_9am=[];
 yearly_9am_day=[];
 yearly_9am_temp=[];
 yearly_9am_rh=[];
+yearly_9am_tracks=[];
 
 ac_stats=["ModeSId","Reports", "DeltaErr", "MinAlt", "MaxAlt", "MinRng", "MaxRng", "MinElev", "MaxElev", "Start", "Stop"];
 for i = 1:1:size(AllDays,1)
     if length(AllDays(i).name) ~= 10
-        fprintf("%%%%%% Unexpected file/dir %s expected dir of format YYYY-MM-DD, skipping\n",AllDays(i).name)
+        debug_out(dbgstate, sprintf("Unexpected file/dir %s expected dir of format YYYY-MM-DD, skipping\n",AllDays(i).name));
         continue
     else
         if (AllDays(i).isdir)
             ThisDate=sprintf ("%s",AllDays(i).name);
-            fprintf("%%%%%%%%%% Doing %s\n",ThisDate);
-            CurrPath="~/bn_data/"+ThisDate+"/SIC_045_BNE/TGT/CSV/";
+            fprintf("###### Doing %s at time %s\n",ThisDate,datestr(now));
+            CurrPath=srcdir+ThisDate+"/"+radnam+"/TGT/CSV/";
             AllTracks=dir (CurrPath+"SIC*.csv");
             NumberOfTracksThisDay=size(AllTracks,1);
             sampletracks_9am=0;
@@ -128,11 +156,13 @@ for i = 1:1:size(AllDays,1)
                     % (>2 means: ignore current and parent dir filenames)
                     ThisTrackFname=CurrPath+AllTracks(j).name;
                     details=split(AllTracks(j).name,"_");
-                    qos=is_qos(details);
+
+                    qos=~isempty(strfind(AllTracks(j).name, "QoS"));
 
                     msid=string(details(6));
                     opts = detectImportOptions(ThisTrackFname,'Delimiter',delimiter,'PartialFieldRule','keep');
                     opts.SelectedVariableNames = opts.SelectedVariableNames([9, 27, 29, 31, 32, 34, 38, 39, 44, 79]);
+
 
                     % Read the stat summary -extra fields on 1st data line
                     fid = fopen(ThisTrackFname,'rt');
@@ -142,9 +172,10 @@ for i = 1:1:size(AllDays,1)
                     RangeErrCnt=str2double(a(159)); % ie field 67 on 2nd line
                     RangeBias=str2double(a(163)); % ie field 71 on 2nd line
                     if (isnan(RangeBias) || isnan(RangeErrCnt) || RangeErrCnt==0)
-                        debug_out(true,sprintf("Skipping %s as RangeErrorCount BT 2 and 10 == %d giving RangeBias %d\n",ThisTrackFname,RangeErrCnt, RangeBias) );
+                        debug_out(dbgstate,sprintf("Skipping %s as RangeErrorCount BT 2 and 10 == %d giving RangeBias %d\n",ThisTrackFname,RangeErrCnt, RangeBias) );
                         continue
                     end
+                     debug_out(dbgstate, sprintf("Reading file %s as it has nonzero Range Error Count\n",ThisTrackFname));
                     T = readtable(ThisTrackFname,opts);
                     T.Properties.VariableNames=varNames;
                     today=posixtime(datetime(ThisDate));
@@ -237,57 +268,31 @@ for i = 1:1:size(AllDays,1)
                         %                    matrix unless all same size (padding) so encoding with
                         %                    in col vector using a size vertor
 
-                        if track_plot_daily == true
-                            f=figure;
-                            f.Renderer = 'painters';
-                            p1=plot(T1.RFS_Range,T1.RangeError-RangeBias,':k','LineWidth', 1);
-                            hold on
-                        end
+
                         coefficients = polyfit(T1.RFS_Range,T1.RangeError-RangeBias, 2);
                         xFit = linspace(min_range, max_range, samples);
                         yFit = polyval(coefficients , xFit);
                         if sum(isnan(yFit)) ~= 0
-                            fprintf("NAN produced by regression on %s\n",this_sample);
-                            coefficients
-                            nanidx=find(isnan(yFit))
-                            T1.RFS_Detection_Time(nanidx)
-                            stop
+                            fprintf("###### NAN produced by regression on %s\n",this_sample);
+                            fprintf("###### Coefficients %s, indicies of yFit and xFit times follow\n",coefficients);
+                            nanidx=find(isnan(yFit));
+                            T1.RFS_Detection_Time(nanidx);
+                            continue
                         end
                         txt1=sprintf("%s\n",ac_stats);
                         txt2=sprintf("%s\n",ac_data);
                         fv = [1:samples-1;2:samples]';
-                        if track_plot_daily == true
-                            p2=patch('faces',fv,'vertices',[xFit; yFit]',...
-                                'faceVertexCData',col_elev,...
-                                'edgecolor','flat',...
-                                'linewidth',2)
-
-                            %scatter(xFit, yFit,1,col_elev, 'LineWidth', 2);
-                            hold on;
-
-
-                            colormap([col1; col2; col3; col4]);
-
-
-                            hcb=colorbar('Ticks',[0.125,0.375,0.625,0.875],...
-                                'TickLabels',{'>10^o','<=10^o','<=5^o','<=2^o'})
-
-                            colorTitleHandle = get(hcb,'Title');
-                            titleString = sprintf('Aircraft Elevation Angle\n(to Radar)');
-                            set(colorTitleHandle ,'String',titleString);
-                        end
-                        titlename=sprintf("Range vs Range Error (Actual and Regession)\n");
+                        
+                        
                         if q==1
                             Temp_3pm=AllBomData{yesbomref,11};
                             RelHum_3pm=AllBomData{yesbomref,12};
                             Date_3pm=yester_str;
                             Period_3pm = sprintf("3pm +/- 1 hr %s      %02.1f^oC      %d%% Rel Humid",Date_3pm,Temp_3pm,RelHum_3pm);
-
-                            %Period="3pm "+string(yester)+" "+string(AllBomData{yesbomref,11})+"^oC "+string(AllBomData{yesbomref,12})+"% Rel Humd";
-                            actual_T1_samples_3pm=[actual_T1_samples_3pm; samples];
-                            actual_T1_Range_3pm=[actual_T1_Range_3pm; T1.RFS_Range];
-                            actual_T1_RangeErr_3pm=[actual_T1_RangeErr_3pm; T1.RangeError-RangeBias];
-                            fname="~/"+msid+"_3pm_"+yester_str+".png";
+%                             actual_T1_samples_3pm=[actual_T1_samples_3pm; samples];
+%                             actual_T1_Range_3pm=[actual_T1_Range_3pm; T1.RFS_Range];
+%                             actual_T1_RangeErr_3pm=[actual_T1_RangeErr_3pm; T1.RangeError-RangeBias];
+                            fname=outdir+msid+"_3pm_"+yester_str+".png";
 
                         else
                             Temp_9am=AllBomData{bomref,5};
@@ -295,66 +300,71 @@ for i = 1:1:size(AllDays,1)
                             Date_9am=ThisDate;
                             Period_9am = sprintf("9am +/- 1 hr %s      %02.1f^oC      %d%% Rel Humid",Date_9am,Temp_9am,RelHum_9am);
 
-
-                            %Period = "9am "+ThisDate+" "+string(AllBomData{bomref,5})+"^oC "+string(AllBomData{bomref,6})+"% Rel Humd";
-                            actual_T1_samples_9am=[actual_T1_samples_9am; samples];
-                            actual_T1_Range_9am=[actual_T1_Range_9am; T1.RFS_Range];
-                            actual_T1_RangeErr_9am=[actual_T1_RangeErr_9am; T1.RangeError-RangeBias];
-                            fname="~/"+msid+"_9am_"+ThisDate+".png";
+%                             actual_T1_samples_9am=[actual_T1_samples_9am; samples];
+%                             actual_T1_Range_9am=[actual_T1_Range_9am; T1.RFS_Range];
+%                             actual_T1_RangeErr_9am=[actual_T1_RangeErr_9am; T1.RangeError-RangeBias];
+                            fname=outdir+msid+"_9am_"+ThisDate+".png";
                         end
 
-
-
-
                         if track_plot_daily == true
+                            % This plots the actual (ie non extrapolated) range vs range error
+                            % and the regression over that range
+                            % coloured by elevation measurement (more
+                            % thicker atmosphere for RF to travel through)
+                            f=figure;
+                            f.Renderer = 'painters';
+                            p1=plot(T1.RFS_Range,T1.RangeError-RangeBias,':k','LineWidth', 1);
+                            hold on
+
+                            p2=patch('faces',fv,'vertices',[xFit; yFit]',...
+                                'faceVertexCData',col_elev,...
+                                'edgecolor','flat',...
+                                'linewidth',2);
+
+                            %scatter(xFit, yFit,1,col_elev, 'LineWidth', 2);
+                            hold on;
+                            colormap([col1; col2; col3; col4]);
+                            hcb=colorbar('Ticks',[0.125,0.375,0.625,0.875],...
+                                'TickLabels',{'>10^o','<=10^o','<=5^o','<=2^o'});
+
+                            colorTitleHandle = get(hcb,'Title');
+                            titleString = sprintf('Aircraft Elevation Angle\n(to Radar)');
+                            set(colorTitleHandle ,'String',titleString);
+
                             xlabel("Range to Aircraft (Nautical Miles)");
                             ylabel("Range Error (metres)");
                             legend("Actual Error","Regression Error");
+                            titlename=sprintf("%s Range vs Range Error (Actual and Regession)\n",radnamstr);
                             if q==1
-                                title(titlename+Period_3pm)
+                                title(titlename+Period_3pm);
                             else
-                                title(titlename+Period_9am)
+                                title(titlename+Period_9am);
                             end
                             yl=ylim;
-                            text(220,yl(2)-0.2*(yl(2)-yl(1)),txt1)
-                            text(235,yl(2)-0.2*(yl(2)-yl(1)),txt2)
-                            box on
+                            text(220,yl(2)-0.2*(yl(2)-yl(1)),txt1);
+                            text(235,yl(2)-0.2*(yl(2)-yl(1)),txt2);
+                            box on;
                             set(gcf, 'Position', get(0, 'Screensize'));
                             saveas(gcf,fname);
                             close
                         end
 
                         % Now extrapolate the range error over the whole radar range
+                        % and save for later comparisons
                         xtrap=[0:1:250];
-
                         ytrap = polyval(coefficients, xtrap);
-                        % Save these interpolated errors at sample points for later comparison
-
-
-
-
-                        %extrap_rng_err(find(isnan(extrap_rng_err)))=[];
-
-
                         [rerr_avg rerr_std rerr_median] = stats(ytrap);
-% if sum(isnan(ytrap)) ~= 0
-%      fprintf("NAN produced by regression on %s at stats call\n",this_sample);
-%                             coefficients
-%                             nanidx=find(isnan(ytrap))
-%                             xtrap(nanidx)
-%                             stop
-% end
 
                         if q==1
-                            y_3pm=[y_3pm; rerr_avg ];
-                            ym_3pm=[ym_3pm; rerr_median];
-                            ys_3pm=[ys_3pm; rerr_std];
+                            y_3pm=             [y_3pm;              rerr_avg ];
+                            ym_3pm=            [ym_3pm;             rerr_median];
+                            ys_3pm=            [ys_3pm;             rerr_std];
                             extrap_rng_err_3pm=[extrap_rng_err_3pm; ytrap];
                             sampletracks_3pm = sampletracks_3pm + 1;
                         else
-                            y_9am=[y_9am; rerr_avg];
-                            ym_9am=[ym_9am; rerr_median ];
-                            ys_9am=[ys_9am; rerr_std];
+                            y_9am=             [y_9am;              rerr_avg];
+                            ym_9am=            [ym_9am;             rerr_median ];
+                            ys_9am=            [ys_9am;             rerr_std];
                             extrap_rng_err_9am=[extrap_rng_err_9am; ytrap];
                             sampletracks_9am = sampletracks_9am + 1;
                         end
@@ -364,87 +374,111 @@ for i = 1:1:size(AllDays,1)
             end
 
             if summary_daily_plot
-                plot_stats(extrap_rng_err_3pm,"Daily 3pm"+yester_str);
-                plot_stats(extrap_rng_err_9am,"Daily 3pm"+today_str);
+
+                plot_stats(extrap_rng_err_3pm,"Daily 3pm "+yester_str, outdir, sampletracks_3pm, radnamstr);
+                plot_stats(extrap_rng_err_9am,"Daily 9am "+ThisDate, outdir, sampletracks_9am, radnamstr);
                 %[y2 y2s y2m] = stats(extrap_rng_err_3pm); % check if same or not
             end
-            daily_3pm=[daily_3pm; extrap_rng_err_3pm];
-            daily_3pm_day=[daily_3pm_day; Date_3pm];
-            daily_3pm_temp=[daily_3pm_temp; Temp_3pm];
-            daily_3pm_rh=[daily_3pm_rh; RelHum_3pm];
+            daily_3pm=[daily_3pm;              extrap_rng_err_3pm];
+            daily_3pm_day=[daily_3pm_day;      Date_3pm];
+            daily_3pm_temp=[daily_3pm_temp;    Temp_3pm];
+            daily_3pm_rh=[daily_3pm_rh;        RelHum_3pm];
+            daily_3pm_tracks=[daily_3pm_tracks sampletracks_3pm];
 
-            daily_9am=[daily_9am; extrap_rng_err_9am];
-            daily_9am_day=[daily_9am_day; Date_9am];
-            daily_9am_temp=[daily_9am_temp; Temp_9am];
-            daily_9am_rh=[daily_9am_rh; RelHum_9am];
+            daily_9am=[daily_9am;              extrap_rng_err_9am];
+            daily_9am_day=[daily_9am_day;      Date_9am];
+            daily_9am_temp=[daily_9am_temp;    Temp_9am];
+            daily_9am_rh=[daily_9am_rh;        RelHum_9am];
+            daily_9am_tracks=[daily_9am_tracks sampletracks_9am];
+
+             extrap_rng_err_9am=[];
+             Date_9am = "";
+             Temp_9am=-400;
+             RelHum_9am=-400;
+             sampletracks_9am=0;
+
+             extrap_rng_err_3pm=[];
+             Date_3pm = "";
+             Temp_3pm=-400;
+             RelHum_3pm=-400;
+             sampletracks_3pm=0;
         end
     end
- 
-    % Get monthly max and min temp and humidity
-    [max9t maxidx9t]=max(daily_9am_temp);
-    [min9t minidx9t]=min(daily_9am_temp);
-    [max3t maxidx3t]=max(daily_3pm_temp);
-    [min3t minidx3t]=min(daily_3pm_temp);
 
-    [max9h maxidx9h]=max(daily_9am_rh);
-    [min9h minidx9h]=min(daily_9am_rh);
-    [max3h maxidx3h]=max(daily_3pm_rh);
-    [min3h minidx3h]=min(daily_3pm_rh);
-
-    % plot these
-    if summary_monthly_plot
-        if tomor_mth ~= today_mth
-            plot_stats(daily_9am,"Monthly 9am "+today_mth);
-            plot_stats(daily_3pm,"Monthly 3pm" +today_mth); % use 9am as we will use that month (next 3pm will be used for next month)
-
-            yearly_3pm=[yearly_3pm; monthly_3pm];
-            yearly_3pm_day=[yearly_3pm_day; monthly_3pm_day];
-            yearly_3pm_temp=[yearly_3pm_temp; monthly_3pm_temp];
-            yearly_3pm_rh=[yearly_3pm_rh; monthly_3pm_rh];
-
-            yearly_9am=[yearly_9am; monthly_9am];
-            yearly_9am_day=[yearly_9am_day; monthly_9am_day];
-            yearly_9am_temp=[yearly_9am_temp; monthly_9am_temp];
-            yearly_9am_rh=[yearly_9am_rh; monthly_9am_rh];
-
-            monthly_3pm=[];
-            monthly_3pm_day=[];
-            monthly_3pm_temp=[];
-            monthly_3pm_rh=[];
-
-            monthly_9am=[];
-            monthly_9am_day=[];
-            monthly_9am_temp=[];
-            monthly_9am_rh=[];
-
-        end
-
-    end
     % save yearly for overall average to compare later
-    monthly_3pm=[monthly_3pm; daily_3pm];
-    monthly_3pm_day=[monthly_3pm_day; daily_3pm_day];
-    monthly_3pm_temp=[monthly_3pm_temp; daily_3pm_temp];
-    monthly_3pm_rh=[monthly_3pm_rh; daily_3pm_rh];
+    monthly_3pm=[monthly_3pm;            daily_3pm];
+    monthly_3pm_day=[monthly_3pm_day;    daily_3pm_day];
+    monthly_3pm_temp=[monthly_3pm_temp;  daily_3pm_temp];
+    monthly_3pm_rh=[monthly_3pm_rh;      daily_3pm_rh];
+    monthly_3pm_tracks=[monthly_3pm_tracks; daily_3pm_tracks];
 
-    monthly_9am=[monthly_9am; daily_9am];
-    monthly_9am_day=[monthly_9am_day; daily_9am_day];
-    monthly_9am_temp=[monthly_9am_temp; daily_9am_temp];
-    monthly_9am_rh=[monthly_9am_rh; daily_9am_rh];
+    monthly_9am=[monthly_9am;            daily_9am];
+    monthly_9am_day=[monthly_9am_day;    daily_9am_day];
+    monthly_9am_temp=[monthly_9am_temp;  daily_9am_temp];
+    monthly_9am_rh=[monthly_9am_rh;      daily_9am_rh];
+    monthly_9am_tracks=[monthly_9am_tracks; daily_9am_tracks];
+
+    if tomor_mth ~= today_mth
+        % Get monthly max and min temp and humidity
+        [max9t maxidx9t]=max(daily_9am_temp);
+        [min9t minidx9t]=min(daily_9am_temp);
+        [max3t maxidx3t]=max(daily_3pm_temp);
+        [min3t minidx3t]=min(daily_3pm_temp);
+
+        [max9h maxidx9h]=max(daily_9am_rh);
+        [min9h minidx9h]=min(daily_9am_rh);
+        [max3h maxidx3h]=max(daily_3pm_rh);
+        [min3h minidx3h]=min(daily_3pm_rh);
+
+        % plot these
+        if summary_monthly_plot
+            plot_stats(monthly_9am,"Monthly 9am "+today_mth, outdir, sum(monthly_9am_tracks),radnamstr);
+            plot_stats(monthly_3pm,"Monthly 3pm "+today_mth, outdir, sum(monthly_3pm_tracks),radnamstr); % use 9am as we will use that month (next 3pm will be used for next month)
+        end
+        yearly_3pm=[yearly_3pm;           monthly_3pm];
+        yearly_3pm_day=[yearly_3pm_day;   monthly_3pm_day];
+        yearly_3pm_temp=[yearly_3pm_temp; monthly_3pm_temp];
+        yearly_3pm_rh=[yearly_3pm_rh;     monthly_3pm_rh];
+yearly_3pm_tracks=[yearly_3pm_tracks; monthly_3pm_tracks];
+
+        yearly_9am=[yearly_9am;           monthly_9am];
+        yearly_9am_day=[yearly_9am_day;   monthly_9am_day];
+        yearly_9am_temp=[yearly_9am_temp; monthly_9am_temp];
+        yearly_9am_rh=[yearly_9am_rh;     monthly_9am_rh];
+        yearly_9am_tracks=[yearly_9am_tracks; monthly_9am_tracks];
+
+        monthly_3pm=[];
+        monthly_3pm_day=[];
+        monthly_3pm_temp=[];
+        monthly_3pm_rh=[];
+        monthly_3pm_tracks=[];
+
+        monthly_9am=[];
+        monthly_9am_day=[];
+        monthly_9am_temp=[];
+        monthly_9am_rh=[];
+        monthly_9am_tracks=[];
+    end
+
 
     daily_9am=[];
     daily_9am_day=[];
     daily_9am_temp=[];
     daily_9am_rh=[];
+    daily_9am_tracks=[];
 
     daily_3pm=[];
     daily_3pm_day=[];
     daily_3pm_temp=[];
     daily_3pm_rh=[];
+    daily_3pm_tracks=[];
 end
-%plot(x,y, '-r');
-%plot(x,ym, '-b');
 
-%legend("3pm Average of population at Range X","Median of population at Range X");
+plot_stats(yearly_9am,"Yearly 9am ", outdir, sum(yearly_9am_tracks),radnamstr);
+plot_stats(yearly_3pm,"Yearly 3pm ", outdir, sum(yearly_3pm_tracks),radnamstr);
+
+endtime=datestr(now)
+fprintf("###### Ending now at %s\n",endtime)
 
 function [avg stdev median1]=stats(array)
 avg=mean(array);
@@ -474,29 +508,36 @@ if doit
 end
 end
 
-function plot_stats(errs, titnam)
-figure
-len=size(errs,2)
+function plot_stats(errs, titnam, od, samples, r)
+figure;
+len=size(errs,2);
+if len ~= 251
+    fprintf("%%%%% Error: Misaligned vectors, expected %d == 251, lets see what happens....\n",len);
+end
 x=[0:1:250];
 y=mean(errs,'omitnan');
 ym=median(errs,'omitnan');
 ys=std(errs,'omitnan');
 %ymax=max(errs,[],'omitnan');
 %ymin=min(errs,[],'omitnan');
+
+if size(y,1) > 1 || size(ys,1)>1
+    fprintf("Going to stop\n");
+end
 errorbar(x,y,ys);
-hold on
+hold on;
 %errorbar(x,ym,ymin,ymax)
-plot(x,ym)
-legend("Average (+/- 1 sigma)","Median")
-title(titnam) % first to last of daily_9am_day
+plot(x,ym);
+legend("Average (+/- 1 sigma)","Median");
+
+fname=od+strrep(titnam," ","_")+".png";
+titlename=sprintf("%s %s\nSamples=%d",r,titnam, samples);
+title(titlename); 
+box on;
+set(gcf, 'Position', get(0, 'Screensize'));
+saveas(gcf,fname);
+close;
 %errorbar(x,ym,[rerr_0_std rerr_50_std rerr_100_std rerr_150_std rerr_200_std rerr_250_std ]);
 %[y2 y2s y2m] = stats(daily9am); % check if same or not
 end
 
-function q=is_qos(d)
-if length(d)>8
-    q="yes";
-else
-    q="no";
-end
-end
