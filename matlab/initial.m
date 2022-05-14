@@ -1,4 +1,4 @@
-clear allyearly_3pm_rh
+clear all
 close all
 startingtime=datestr(now);
 started=sprintf("###### Starting now at %s\n",startingtime);
@@ -12,15 +12,19 @@ summary_monthly_plot=true;
 dbgstate=true;
 
 
-site="bn";
+site="hns";
 if site=="bn"
    srcdir="~/bn_data/";
    bomdir="~/bom_bne/";
    radnam="SIC_045_BNE";
-else
+elseif site == "ml"
    radnam="SIC_049_MCD";
    bomdir="~/bom_ml/";
    srcdir="~/mlVdata/";
+elseif site == "hns"
+radnam="SIC_041_HNS";
+   bomdir="~/bom_hns/";
+   srcdir="~/hns_data/"; 
 end
 
 outdir=srcdir+"out/";
@@ -139,15 +143,27 @@ yearly_9am_tracks=[];
 
 ac_stats=["ModeSId","Reports", "DeltaErr", "MinAlt", "MaxAlt", "MinRng", "MaxRng", "MinElev", "MaxElev", "Start", "Stop"];
 for i = 1:1:size(AllDays,1)
+                 extrap_rng_err_9am=[];
+             Date_9am = "";
+             Temp_9am=-400;
+             RelHum_9am=-400;
+             sampletracks_9am=0;
+
+             extrap_rng_err_3pm=[];
+             Date_3pm = "";
+             Temp_3pm=-400;
+             RelHum_3pm=-400;
+             sampletracks_3pm=0;
     if length(AllDays(i).name) ~= 10
         debug_out(dbgstate, sprintf("Unexpected file/dir %s expected dir of format YYYY-MM-DD, skipping\n",AllDays(i).name));
         continue
     else
         if (AllDays(i).isdir)
+            Date_3pm = "";
             ThisDate=sprintf ("%s",AllDays(i).name);
             fprintf("###### Doing %s at time %s\n",ThisDate,datestr(now));
             CurrPath=srcdir+ThisDate+"/"+radnam+"/TGT/CSV/";
-            AllTracks=dir (CurrPath+"SIC*.csv");
+            AllTracks=dir (CurrPath+"SIC*_v2_QoS_correlated.csv");
             NumberOfTracksThisDay=size(AllTracks,1);
             sampletracks_9am=0;
             sampletracks_3pm=0;
@@ -346,7 +362,7 @@ for i = 1:1:size(AllDays,1)
                             box on;
                             set(gcf, 'Position', get(0, 'Screensize'));
                             saveas(gcf,fname);
-                            close
+                            close(f)
                         end
 
                         % Now extrapolate the range error over the whole radar range
@@ -379,12 +395,13 @@ for i = 1:1:size(AllDays,1)
                 plot_stats(extrap_rng_err_9am,"Daily 9am "+ThisDate, outdir, sampletracks_9am, radnamstr);
                 %[y2 y2s y2m] = stats(extrap_rng_err_3pm); % check if same or not
             end
-            daily_3pm=[daily_3pm;              extrap_rng_err_3pm];
-            daily_3pm_day=[daily_3pm_day;      Date_3pm];
-            daily_3pm_temp=[daily_3pm_temp;    Temp_3pm];
-            daily_3pm_rh=[daily_3pm_rh;        RelHum_3pm];
-            daily_3pm_tracks=[daily_3pm_tracks sampletracks_3pm];
-
+ 
+                daily_3pm=[daily_3pm;              extrap_rng_err_3pm];
+                daily_3pm_day=[daily_3pm_day;      Date_3pm];
+                daily_3pm_temp=[daily_3pm_temp;    Temp_3pm];
+                daily_3pm_rh=[daily_3pm_rh;        RelHum_3pm];
+                daily_3pm_tracks=[daily_3pm_tracks sampletracks_3pm];
+ 
             daily_9am=[daily_9am;              extrap_rng_err_9am];
             daily_9am_day=[daily_9am_day;      Date_9am];
             daily_9am_temp=[daily_9am_temp;    Temp_9am];
@@ -509,7 +526,7 @@ end
 end
 
 function plot_stats(errs, titnam, od, samples, r)
-figure;
+
 len=size(errs,2);
 x=[0:1:250];
 y=mean(errs,'omitnan');
