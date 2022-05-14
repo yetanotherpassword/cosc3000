@@ -27,7 +27,7 @@ outdir=srcdir+"out/";
 if ~isdir(outdir)
     mkdir (outdir)
 end
-stop
+
 radnamstr=replace(radnam,'_',' ');
 AllBomData=[];
 AllBom=dir (bomdir+"*.csv");
@@ -175,7 +175,7 @@ for i = 1:1:size(AllDays,1)
                         debug_out(dbgstate,sprintf("Skipping %s as RangeErrorCount BT 2 and 10 == %d giving RangeBias %d\n",ThisTrackFname,RangeErrCnt, RangeBias) );
                         continue
                     end
-                     debug_out(dbgstate, sprintf("Reading file %s as it has nonzero Range Error Count\n",ThisTrackFname));
+                    debug_out(dbgstate, sprintf("Reading file %s as it has nonzero Range Error Count\n",ThisTrackFname));
                     T = readtable(ThisTrackFname,opts);
                     T.Properties.VariableNames=varNames;
                     today=posixtime(datetime(ThisDate));
@@ -439,7 +439,7 @@ for i = 1:1:size(AllDays,1)
         yearly_3pm_day=[yearly_3pm_day;   monthly_3pm_day];
         yearly_3pm_temp=[yearly_3pm_temp; monthly_3pm_temp];
         yearly_3pm_rh=[yearly_3pm_rh;     monthly_3pm_rh];
-yearly_3pm_tracks=[yearly_3pm_tracks; monthly_3pm_tracks];
+        yearly_3pm_tracks=[yearly_3pm_tracks; monthly_3pm_tracks];
 
         yearly_9am=[yearly_9am;           monthly_9am];
         yearly_9am_day=[yearly_9am_day;   monthly_9am_day];
@@ -511,9 +511,6 @@ end
 function plot_stats(errs, titnam, od, samples, r)
 figure;
 len=size(errs,2);
-if len ~= 251
-    fprintf("%%%%% Error: Misaligned vectors, expected %d == 251, lets see what happens....\n",len);
-end
 x=[0:1:250];
 y=mean(errs,'omitnan');
 ym=median(errs,'omitnan');
@@ -521,23 +518,27 @@ ys=std(errs,'omitnan');
 %ymax=max(errs,[],'omitnan');
 %ymin=min(errs,[],'omitnan');
 
-if size(y,1) > 1 || size(ys,1)>1
-    fprintf("Going to stop\n");
-end
-errorbar(x,y,ys);
-hold on;
-%errorbar(x,ym,ymin,ymax)
-plot(x,ym);
-legend("Average (+/- 1 sigma)","Median");
+if size(y,1) > 1 && size(ys,1) > 1 && len == 251
+    figure
+    errorbar(x,y,ys);
+    hold on;
+    %errorbar(x,ym,ymin,ymax)
+    plot(x,ym);
+    legend("Average (+/- 1 sigma)","Median");
 
-fname=od+strrep(titnam," ","_")+".png";
-titlename=sprintf("%s %s\nSamples=%d",r,titnam, samples);
-title(titlename); 
-box on;
-set(gcf, 'Position', get(0, 'Screensize'));
-saveas(gcf,fname);
-close;
-%errorbar(x,ym,[rerr_0_std rerr_50_std rerr_100_std rerr_150_std rerr_200_std rerr_250_std ]);
-%[y2 y2s y2m] = stats(daily9am); % check if same or not
+    fname=od+strrep(titnam," ","_")+".png";
+    titlename=sprintf("%s %s\nSamples=%d",r,titnam, samples);
+    title(titlename); 
+    box on;
+    set(gcf, 'Position', get(0, 'Screensize'));
+    saveas(gcf,fname);
+    close;
+    %errorbar(x,ym,[rerr_0_std rerr_50_std rerr_100_std rerr_150_std rerr_200_std rerr_250_std ]);
+    %[y2 y2s y2m] = stats(daily9am); % check if same or not
+else
+    fprintf("All Y are NaN, so skipping plot\n");
+end
+
+
 end
 
