@@ -13,9 +13,9 @@ else
     sic="049";
 end
 
-varNames={'Date','RangeStdDev','RangeGain','RangeBias','MinTemp','MaxTemp','am9Temp','am9RelHumid','pm3Temp','pm3RelHumid' };
+varNames={'Date','RangeStdDev','RangeGain','RangeBias','MinTemp','MaxTemp','am9Temp','am9RelHumid' ,'9amMSLPres','pm3Temp','pm3RelHumid' ,'pm3MSLPres'};
 opts = detectImportOptions(combined,'Delimiter',',','PartialFieldRule','fill','VariableNamingRule','preserve');
-opts.SelectedVariableNames = opts.SelectedVariableNames([2, 4, 5, 6, 45, 46, 53, 54, 59, 60]);
+opts.SelectedVariableNames = opts.SelectedVariableNames([2, 4, 5, 6, 45, 46, 53, 54, 58, 59, 60, 64]);
 BOMCombo = readtable(combined,opts);
 BOMCombo.Properties.VariableNames=varNames;
 [mint idxtm]=min(BOMCombo.MinTemp);
@@ -47,8 +47,26 @@ RangeGain=BOMCombo.RangeGain;
 RangeBias=BOMCombo.RangeBias;
 MinTemp=BOMCombo.MinTemp;
 MaxTemp=BOMCombo.MaxTemp;
-mat=[ RangeGain   BOMCombo.pm3Temp BOMCombo.pm3RelHumid];
-[coeff,score,latent,tsquared,explained] = pca(mat);
+mat=[ RangeGain   BOMCombo.pm3Temp BOMCombo.pm3RelHumid BOMCombo.pm3MSLPres];
+mat(isnan(mat))=0
+Z=zscore(mat)
+[coeff,score,latent,tsquared,explained] = pca(Z);
+
+figure('Units','normalized','Position',[0.3 0.3 0.3 0.5])
+variables = {'RangeGain','Temp','RelHumidity','MSL Pressure'};
+ax1 = subplot(2,1,1); % Top subplot
+biplot(ax1,coeff(:,1:2),'Scores',score(:,1:2),'VarLabels',variables);
+xlim(ax1,[-1 1])
+ylim(ax1,[-1 1])
+title("Principle Component Analysis at "+site)
+ax2 = subplot(2,1,2); % Bottom subplot
+biplot(ax2,coeff(:,3:4),'Scores',score(:,3:4),'VarLabels',variables);
+xlim(ax2,[-1 1]);
+ylim(ax2,[-1 1]);
+xlabel(ax2,'Component 3')
+ylabel(ax2,'Component 4')
+
+figure
 DayDirs = dir ("D:/Downloads/cosc3000-main/SummaryData/202*");
 accum_trk=[];
 accum_gain=[];
