@@ -1,8 +1,8 @@
 clear all
 close all
 
-%prefix="041_HNS";
-prefix="049_MCD";
+prefix="041_HNS";
+%prefix="049_MCD";
 
 if prefix=="041_HNS";
     site="Hahn Tableland (Cairns)";
@@ -13,7 +13,7 @@ else
     sic="049";
 end
 
-varNames={'Date','RangeStdDev','RangeGain','RangeBias','MinTemp','MaxTemp','am9Temp','am9RelHumid' ,'9amMSLPres','pm3Temp','pm3RelHumid' ,'pm3MSLPres'};
+varNames={'Date','RangeStdDev','RangeGain','RangeBias','MinTemp','MaxTemp','am9Temp','am9RelHumid' ,'am9MSLPres','pm3Temp','pm3RelHumid' ,'pm3MSLPres'};
 opts = detectImportOptions(combined,'Delimiter',',','PartialFieldRule','fill','VariableNamingRule','preserve');
 opts.SelectedVariableNames = opts.SelectedVariableNames([2, 4, 5, 6, 45, 46, 53, 54, 58, 59, 60, 64]);
 BOMCombo = readtable(combined,opts);
@@ -48,8 +48,8 @@ RangeBias=BOMCombo.RangeBias;
 MinTemp=BOMCombo.MinTemp;
 MaxTemp=BOMCombo.MaxTemp;
 mat=[ RangeGain   BOMCombo.pm3Temp BOMCombo.pm3RelHumid BOMCombo.pm3MSLPres];
-mat(isnan(mat))=0
-Z=zscore(mat)
+mat(isnan(mat))=0;
+Z=zscore(mat);
 [coeff,score,latent,tsquared,explained] = pca(Z);
 
 figure('Units','normalized','Position',[0.3 0.3 0.3 0.5])
@@ -91,7 +91,7 @@ for j=1:1:size(DayDirs,1)
         HNSSummary=HNSSummary(1:size(HNSSummary,1)-8,:);
         [ix rx]=find(HNSSummary.RangeStdDev > 1000);
         if ~isempty(ix)
-            HNSSummary(ix,:)=[]
+            HNSSummary(ix,:)=[];
         end
 
         [idx0 v]=find(HNSSummary.MaxRange - HNSSummary.MinRange>200);
@@ -116,7 +116,13 @@ for j=1:1:size(DayDirs,1)
             maxsize = thissize;
         elseif delta < 0
             accum_trk=[accum_trk; HNSSummary.Track' zeros(-delta,1)'];
-            accum_gain=[accum_gain; HNSSummary.RangeGain' zeros(-delta,1)'];
+            this_gain=[HNSSummary.RangeGain' zeros(-delta,1)'];
+            %average_gain=mean(this_gain);
+            %underavg1 = this_gain < abs(average_gain);
+            %underavg2 = this_gain > -abs(average_gain);
+            %this_gain(underavg1 & underavg2)=0;
+            %accum_gain=[accum_gain; HNSSummary.RangeGain' zeros(-delta,1)'];
+            accum_gain=[accum_gain; this_gain];
         elseif delta > 0
             tmp = [ accum_trk' ; zeros(size(accum_trk,1),delta)' ];
             accum_trk = tmp';
@@ -158,22 +164,62 @@ accum_gain(accum_gain==0)=nan;
 
 % mesh(BOMCombo.Date, [1:1:size(accum_gain,2)], accum_gain')
 
-
+accum_gain = sort(accum_gain,2,'ascend');
 
 relhum=[];
+temp=[];
+mslpress=[];
 for i=1:1:size(accum_gain,1)
       relhum = [relhum ones(size(accum_gain,2),1)*(BOMCombo.pm3RelHumid(i)+BOMCombo.am9RelHumid(i))/2];
+      temp = [temp ones(size(accum_gain,2),1)*(BOMCombo.pm3Temp(i)+BOMCombo.am9Temp(i))/2];
+      mslpress = [mslpress ones(size(accum_gain,2),1)*(BOMCombo.am9MSLPres(i)+BOMCombo.pm3MSLPres(i))/2];
 end
 
 figure
 ax = surf(BOMCombo.Date', 1:1:size(accum_gain,2), accum_gain',relhum,'FaceColor','textureMap','EdgeColor','none');%,'CDataMapping','scaled')
+colormap(jet(4));
 
+hcb=colorbar;
+caxis([mean(relhum,'all','omitnan')-2.5*std(relhum,[],'all','omitnan') mean(relhum,'all','omitnan')+2.5*std(relhum,[],'all','omitnan')]);
+ax.LineStyle = 'none';
+ax.EdgeColor = 'flat';
+ax.FaceColor = 'flat';
+
+titlename=sprintf("Range Gain Annual Variability for %s",site);
+xlabel("(Day of Year) 01-03-2021 to 28-02-2022");
+ylabel("Individual Opportunity Aircraft");
+zlabel("Range Error Gain m/NM");
+title(titlename);
+colorTitleHandle = get(hcb,'Title');
+set(colorTitleHandle ,'String', 'Relative Humidity %');
+
+figure
+ay = surf(BOMCombo.Date', 1:1:size(accum_gain,2), accum_gain',temp,'FaceColor','textureMap','EdgeColor','none');%,'CDataMapping','scaled')
+colormap(jet(4));
+
+hcb2=colorbar;
+caxis([mean(temp,'all','omitnan')-2.5*std(temp,[],'all','omitnan') mean(temp,'all','omitnan')+2.5*std(temp,[],'all','omitnan')]);
+ay.LineStyle = 'none';
+ay.EdgeColor = 'flat';
+ay.FaceColor = 'flat';
+
+titlename=sprintf("Range Gain Annual Variability for %s",site);
+xlabel("(Day of Year) 01-03-2021 to 28-02-2022");
+ylabel("Individual Opportunity Aircraft");
+zlabel("Range Error Gain m/NM");
+title(titlename);
+colorTitleHandle = get(hcb2,'Title');
+set(colorTitleHandle ,'String', 'Temperature (^oC)');
+
+
+figure
+az = surf(BOMCombo.Date', 1:1:size(accum_gain,2), accum_gain',mslpress,'FaceColor','textureMap','EdgeColor','none');
 
 
 colormap(jet(4));
 
 hcb=colorbar;
-caxis([mean(relhum,'all','omitnan')-2.5*std(relhum,[],'all','omitnan') mean(relhum,'all','omitnan')+2.5*std(relhum,[],'all','omitnan')]);
+caxis([mean(mslpress,'all','omitnan')-2.5*std(mslpress,[],'all','omitnan') mean(mslpress,'all','omitnan')+2.5*std(mslpress,[],'all','omitnan')]);
 ax.LineStyle = 'none';ax.EdgeColor = 'flat';ax.FaceColor = 'flat';
 
 titlename=sprintf("Range Gain Annual Variability for %s",site);
@@ -182,6 +228,5 @@ ylabel("Individual Opportunity Aircraft");
 zlabel("Range Error Gain m/NM");
 title(titlename);
 colorTitleHandle = get(hcb,'Title');
-titleString = sprintf('Relative Humidity');
-set(colorTitleHandle ,'String', titleString);
+set(colorTitleHandle ,'String', 'MSL Pressure (hPa)');
 
